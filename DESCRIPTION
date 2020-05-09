@@ -18,3 +18,14 @@ Suggests:
     knitr,
     rmarkdown
 VignetteBuilder: knitr
+Imports: 
+    packcircles,
+    tibble,
+    magrittr,
+    dplyr,
+    sf,
+    hershey (>= 0.1.0)
+Remotes: 
+    coolbutuseless/hershey
+Depends: 
+    R (>= 2.10)

@@ -17,36 +17,29 @@ knitr::opts_chunk$set(
 ```{r pkgs}
 library(dplyr)
 library(purrr)
+library(sf)
 library(packcircles)
 library(ggplot2)
+library(ishihara)
 ```
 
 
 ```{r funs}
-
-create_poly_packings <- function(areas,
-                                 n_points){
-
-  n_circles <- length(areas) 
-
-packings <- circleProgressiveLayout(sample(areas, n_circles))
-
-packing_df <- circleLayoutVertices(packings, npoints = n_points)
-
-tibble::as_tibble(packing_df)
-}
-
-
 gg_plot_poly <- function(df_poly){
-ggplot(data = df_poly, 
-       aes(x, y)) + 
-  geom_polygon(aes(group = id), 
-               colour = "black", 
-               fill = "grey90") +
-  coord_equal()
-  
+  ggplot(data = df_poly, 
+         aes(x = x, 
+             y = y)) + 
+    geom_polygon(aes(group = id), 
+                 colour = "black", 
+                 fill = "grey90") +
+    coord_equal()
 }
+```
 
+```{r}
+create_poly_packings(areas = c(1:20),
+                     n_points = 3) %>% 
+  gg_plot_poly()
 ```
 
 ```{r}
@@ -55,38 +48,13 @@ circle_vec <- sample(x = 1:100,
                      prob = (1:100)/100,
                      replace = TRUE)
 
-create_poly_packings(areas = c(1:20),
-                     n_points = 3) %>% 
-  gg_plot_poly()
-
-library(sf)
-library(dplyr)
-poly_df <- create_poly_packings(areas = c(1:3),
-                                 n_sets = 1,
-                                 n_points = 100) 
-
-cast_packing_poly <- function(poly_packing){
-st_as_sf(poly_packing,
-         coords = c("x", "y")) %>% 
-  group_by(id) %>%
-  summarise(do_union = FALSE) %>%
-  st_cast("POLYGON") %>% 
-  ungroup() 
-}
-
-cast_packing_poly(poly_df)
-
-circle_vec <- sample(x = 1:100,
-                     size = 1000,
-                     prob = (1:100)/100,
-                     replace = TRUE)
-
-
 create_poly_packings(areas = circle_vec,
                      n_points = 100)  %>% 
   cast_packing_poly() %>% 
   plot(main = "")
+```
 
+```{r}
 poly_df <- create_poly_packings(areas = rep(1, 6), n_points = 4)  
 
 ggplot(poly_df,
@@ -104,7 +72,10 @@ ggplot(poly_df,
   geom_polygon(data = df_block, fill = "salmon") +
   geom_polygon(fill = "grey") +
   coord_equal()
+```
 
+
+```{r}
 df_sf_square <- cast_packing_poly(poly_df)
 df_sf_block <- cast_packing_poly(df_block)
 
@@ -116,20 +87,6 @@ ggplot(df_sf_square) +
 which things intersect?
 
 ```{r}
-df_sf_square
-df_sf_block
-st_overlaps(df_sf_square, df_sf_block)
-
-lengths(st_within(df_sf_square, df_sf_block))
-
-is_sf_within <- function(x, y) {
-  as.logical(lengths(st_within(x, y)))
-}
-
-is_sf_intersects <- function(x, y) {
-  as.logical(lengths(st_intersects(x, y)))
-}
-
 df_sf_square %>% 
   mutate(overlap = is_sf_within(df_sf_square, df_sf_block),
          intersect = is_sf_intersects(df_sf_square, df_sf_block)) %>%
@@ -140,71 +97,183 @@ df_sf_square %>%
 
 OK, so now to bring in the vector fonts of cool but useless.
 
-```{r}
-library(hershey)
-
-font_df <- hershey %>% 
-  filter(font == 'futuram')
-
-head(font_df)
-
-ggplot(font_df) + 
-  geom_path(aes(x, y, group = stroke)) + 
-  coord_equal() + 
-  theme_void() + 
-  facet_wrap(~glyph, labeller = label_both)
-```
 
 Plot the number 7
 
 ```{r}
-font_df %>% 
-  filter(char == "7") %>% 
-  ggplot() + 
-  geom_path(aes(x, y, group = stroke)) + 
+ggplot(char_7,
+       aes(x, y, group = stroke)) + 
+  geom_path() +
+  geom_label(aes(label = idx)) +
+  # geom_polygon(aes(x, y, group = stroke)) +
   coord_equal()
-
-font_sf_7 <- font_df %>% 
-  filter(char == "7") %>% 
-  st_as_sf(coords = c("x", "y")) %>% 
-  group_by(char) %>%
-  summarise(do_union = FALSE) %>%
-  st_cast("POLYGON") %>% 
-  ungroup() 
-
-font_sf_7 %>% 
-  ggplot() +
-  geom_sf()
 ```
 
 ```{r}
-circle_vec <- sample(x = ((1:150)/100),
+library(gridfont)
+
+plot_df <- create_text_df("1", font='smooth')
+
+ggplot(plot_df, aes(x, y)) +
+  geom_path(aes(group = interaction(char_idx, stroke)), 
+            na.rm=TRUE) +
+  coord_equal() +
+  theme_void()
+```
+
+
+```{r}
+create_text_df("7", font='smooth') %>% 
+  ggplot(aes(x, y, group = stroke)) + 
+  geom_path() +
+  coord_equal()
+```
+
+
+```{r}
+cast_font_sf <- function(font_df){
+  font_df %>% 
+  st_as_sf(coords = c("x", "y")) %>% 
+  group_by(char) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("LINESTRING") %>% 
+  ungroup() 
+}
+```
+
+```{r}
+char_sf_7 %>% 
+  ggplot() +
+  geom_sf()
+
+# install.packages("smoothr")
+```
+
+```{r}
+font_increase <- function(font_df, size){
+  font_df %>% 
+    mutate(x = x * size,
+           y = y * size)
+}
+
+create_text_df("7", font='smooth') %>% 
+  font_increase(3) %>% 
+  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
+  ggplot(aes(x, y, group = stroke)) + 
+  geom_path() +
+  coord_equal()
+```
+
+
+```{r}
+circle_vec <- sample(x = ((1:125)/100),
                      size = 1000,
                      replace = TRUE)
 
 many_square_sf <- create_poly_packings(areas = circle_vec,
-                                       n_sets = 1,
                                        n_points = 50) %>% 
   cast_packing_poly()
 
+char_sf_7 <- create_text_df("7", font='smooth') %>% 
+  font_increase(4)  %>% 
+  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
+  mutate(y = y + 3) %>% 
+  cast_font_sf()
+
+char_sf_7 %>% 
+  ggplot() +
+  geom_sf(data = many_square_sf) +
+  geom_sf(colour = "red") 
+```
+
+
+```{r}
 adds_text_in_circles <- function(circles, text){
   circles %>% 
-  mutate(in_text = is_sf_intersects(circles, font_sf_7))
+  mutate(in_text = is_sf_intersects(circles, text))
 }
 
-adds_text_in_circles(many_square_sf) %>% 
+char_sf_7 %>% 
+  adds_text_in_circles(many_square_sf, .) %>% 
   ggplot() +
   geom_sf(aes(fill = in_text),
           colour = "white") +
   theme_void() +
   scale_fill_brewer(palette = "Dark2") +
-  labs(title = "Can you see the number 7?",
-       subtitle = "Except that it looks like a triangle...") +
   theme(legend.position = "none")
 
+```
 
-  geom_sf(data = font_sf_7)
+# OK, so putting that all together
 
+```{r}
+create_circle_plate <- function(){
+circle_vec <- sample(x = ((1:125)/100),
+                     size = 1000,
+                     replace = TRUE)
+
+create_poly_packings(areas = circle_vec, n_points = 50) %>% 
+  cast_packing_poly()
+}
+
+text_sf <- function(text){
+  create_text_df(text, font='smooth') %>% 
+  font_increase(4)  %>% 
+  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
+  mutate(y = y + 3) %>% 
+  cast_font_sf()
+}
+
+overlay_text_in_circle <- function(circle_plate, text_sf){
+  circle_plate %>% 
+    mutate(in_text = is_sf_intersects(circle_plate, text_sf))
+}
+
+plot_ishihara <- function(overlayed_text){
+  ggplot(overlayed_text) +
+  geom_sf(aes(fill = in_text),
+          colour = "white") +
+  theme_void() +
+  theme(legend.position = "none")
+}
+
+ishihara_data <- function(text){
+  circle_plate <- create_circle_plate()
+  overlay_text_in_circle(circle_plate, text_sf(text))
+}
+```
+
+```{r}
+cb_1 <- ishihara_data("1")
+
+gg_ishihara <- plot_ishihara(cb_1)
+gg_ishihara
+gg_ishihara + scale_fill_brewer(palette = "Dark2")
+gg_ishihara + scale_fill_viridis_d()
+```
+
+```{r}
+circle_vec <- sample(x = ((1:125)/100),
+                     size = 1000,
+                     replace = TRUE)
+
+circles_df <- create_poly_packings(areas = circle_vec, n_points = 50)
+
+circles_sf <- cast_packing_poly(circles_df)
+
+text_df <- create_text_df("7", font='smooth')
+
+mean(text_df$x)
+mean(text_df$y)
+
+text_df %>% 
+  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
+  font_increase(4)  %>% 
+  # mutate(y = y + 3) %>% 
+  cast_font_sf() %>% 
+  ggplot() +
+  geom_sf(data = circles_sf) +
+  geom_sf()
 ```
 
 
