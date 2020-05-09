@@ -1,0 +1,223 @@
+---
+title: "Proof of Concept"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{first-steps}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r pkgs}
+library(dplyr)
+library(purrr)
+library(packcircles)
+library(ggplot2)
+```
+
+
+```{r funs}
+
+create_poly_packings <- function(areas,
+                                 n_points){
+
+  n_circles <- length(areas) 
+
+packings <- circleProgressiveLayout(sample(areas, n_circles))
+
+packing_df <- circleLayoutVertices(packings, npoints = n_points)
+
+tibble::as_tibble(packing_df)
+}
+
+
+gg_plot_poly <- function(df_poly){
+ggplot(data = df_poly, 
+       aes(x, y)) + 
+  geom_polygon(aes(group = id), 
+               colour = "black", 
+               fill = "grey90") +
+  coord_equal()
+  
+}
+
+```
+
+```{r}
+circle_vec <- sample(x = 1:100,
+                     size = 1000,
+                     prob = (1:100)/100,
+                     replace = TRUE)
+
+create_poly_packings(areas = c(1:20),
+                     n_points = 3) %>% 
+  gg_plot_poly()
+
+library(sf)
+library(dplyr)
+poly_df <- create_poly_packings(areas = c(1:3),
+                                 n_sets = 1,
+                                 n_points = 100) 
+
+cast_packing_poly <- function(poly_packing){
+st_as_sf(poly_packing,
+         coords = c("x", "y")) %>% 
+  group_by(id) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("POLYGON") %>% 
+  ungroup() 
+}
+
+cast_packing_poly(poly_df)
+
+circle_vec <- sample(x = 1:100,
+                     size = 1000,
+                     prob = (1:100)/100,
+                     replace = TRUE)
+
+
+create_poly_packings(areas = circle_vec,
+                     n_points = 100)  %>% 
+  cast_packing_poly() %>% 
+  plot(main = "")
+
+poly_df <- create_poly_packings(areas = rep(1, 6), n_points = 4)  
+
+ggplot(poly_df,
+       aes(x, y, group = id)) + 
+  geom_polygon(fill = "grey") +
+  coord_equal() +
+  geom_text(aes(label = id))
+
+df_block <- data.frame(x = c(-2, 2, 2, -2),
+                       y = c(-2, -2, 1, 1),
+                       id = 1)
+
+ggplot(poly_df,
+       aes(x, y, group = id)) + 
+  geom_polygon(data = df_block, fill = "salmon") +
+  geom_polygon(fill = "grey") +
+  coord_equal()
+
+df_sf_square <- cast_packing_poly(poly_df)
+df_sf_block <- cast_packing_poly(df_block)
+
+ggplot(df_sf_square) +
+  geom_sf(data = df_sf_block, fill = "salmon") +
+  geom_sf() 
+```
+
+which things intersect?
+
+```{r}
+df_sf_square
+df_sf_block
+st_overlaps(df_sf_square, df_sf_block)
+
+lengths(st_within(df_sf_square, df_sf_block))
+
+is_sf_within <- function(x, y) {
+  as.logical(lengths(st_within(x, y)))
+}
+
+is_sf_intersects <- function(x, y) {
+  as.logical(lengths(st_intersects(x, y)))
+}
+
+df_sf_square %>% 
+  mutate(overlap = is_sf_within(df_sf_square, df_sf_block),
+         intersect = is_sf_intersects(df_sf_square, df_sf_block)) %>%
+  ggplot() +
+  geom_sf(data = df_sf_block, fill = "salmon") +
+  geom_sf(aes(colour = overlap))
+```
+
+OK, so now to bring in the vector fonts of cool but useless.
+
+```{r}
+library(hershey)
+
+font_df <- hershey %>% 
+  filter(font == 'futuram')
+
+head(font_df)
+
+ggplot(font_df) + 
+  geom_path(aes(x, y, group = stroke)) + 
+  coord_equal() + 
+  theme_void() + 
+  facet_wrap(~glyph, labeller = label_both)
+```
+
+Plot the number 7
+
+```{r}
+font_df %>% 
+  filter(char == "7") %>% 
+  ggplot() + 
+  geom_path(aes(x, y, group = stroke)) + 
+  coord_equal()
+
+font_sf_7 <- font_df %>% 
+  filter(char == "7") %>% 
+  st_as_sf(coords = c("x", "y")) %>% 
+  group_by(char) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("POLYGON") %>% 
+  ungroup() 
+
+font_sf_7 %>% 
+  ggplot() +
+  geom_sf()
+```
+
+```{r}
+circle_vec <- sample(x = ((1:150)/100),
+                     size = 1000,
+                     replace = TRUE)
+
+many_square_sf <- create_poly_packings(areas = circle_vec,
+                                       n_sets = 1,
+                                       n_points = 50) %>% 
+  cast_packing_poly()
+
+adds_text_in_circles <- function(circles, text){
+  circles %>% 
+  mutate(in_text = is_sf_intersects(circles, font_sf_7))
+}
+
+adds_text_in_circles(many_square_sf) %>% 
+  ggplot() +
+  geom_sf(aes(fill = in_text),
+          colour = "white") +
+  theme_void() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(title = "Can you see the number 7?",
+       subtitle = "Except that it looks like a triangle...") +
+  theme(legend.position = "none")
+
+
+  geom_sf(data = font_sf_7)
+
+```
+
+
+```{r}
+# an example of creating a circle  
+# from https://gis.stackexchange.com/questions/322423/create-a-circle-in-r-and-plot-it-in-a-shapefile
+lon <- -71.06
+lat <- 42.36
+dub <- st_point(x = c(lon, lat), dim = "XYZ")
+dub <- dub %>% st_sfc(crs = 32619)
+m5 <- units::set_units(1, km)
+dub_buffer <-  st_buffer(dub, m5)
+plot(dub_buffer)
+
+```
+
