@@ -24,269 +24,158 @@ library(ishihara)
 ```
 
 
-```{r funs}
-gg_plot_poly <- function(df_poly){
-  ggplot(data = df_poly, 
-         aes(x = x, 
-             y = y)) + 
-    geom_polygon(aes(group = id), 
-                 colour = "black", 
-                 fill = "grey90") +
-    coord_equal()
+```{r setup}
+library(ishihara)
+```
+
+Here's the goal:
+
+1. Create a bunch of circles with `packcircles`.
+2. Convert those circles to an SF object.
+3. Pull in a vector font.
+4. Convert that font into an SF object
+5. Overlay the two SF objects and see where they intersect
+6. Plot the circles that are intersected by the text
+7. Change the colour palette in ggplot2 to see the impact of colourblindness
+
+
+# 1. Create a bunch of circles with `packcircles`
+
+```{r}
+create_circle_plate <- function(){
+  circle_vec <- sample(x = (c(seq(from = 25, to = 150, by = 25))/100),
+                       size = 1000,
+                       replace = TRUE)
+  
+  create_poly_packings(areas = circle_vec, 
+                       n_points = 50)
 }
 ```
 
 ```{r}
-create_poly_packings(areas = c(1:20),
-                     n_points = 3) %>% 
-  gg_plot_poly()
-```
-
-```{r}
-circle_vec <- sample(x = 1:100,
-                     size = 1000,
-                     prob = (1:100)/100,
-                     replace = TRUE)
-
-create_poly_packings(areas = circle_vec,
-                     n_points = 100)  %>% 
-  cast_packing_poly() %>% 
-  plot(main = "")
-```
-
-```{r}
-poly_df <- create_poly_packings(areas = rep(1, 6), n_points = 4)  
-
-ggplot(poly_df,
-       aes(x, y, group = id)) + 
-  geom_polygon(fill = "grey") +
-  coord_equal() +
-  geom_text(aes(label = id))
-
-df_block <- data.frame(x = c(-2, 2, 2, -2),
-                       y = c(-2, -2, 1, 1),
-                       id = 1)
-
-ggplot(poly_df,
-       aes(x, y, group = id)) + 
-  geom_polygon(data = df_block, fill = "salmon") +
-  geom_polygon(fill = "grey") +
-  coord_equal()
+circle_plate <- create_circle_plate()
 ```
 
 
-```{r}
-df_sf_square <- cast_packing_poly(poly_df)
-df_sf_block <- cast_packing_poly(df_block)
+# 2. Convert that to an SF object
 
-ggplot(df_sf_square) +
-  geom_sf(data = df_sf_block, fill = "salmon") +
-  geom_sf() 
+```{r}
+circle_plate_sf <- cast_packing_poly(circle_plate)
 ```
 
-which things intersect?
+# 3. Pull in a vector font
 
 ```{r}
-df_sf_square %>% 
-  mutate(overlap = is_sf_within(df_sf_square, df_sf_block),
-         intersect = is_sf_intersects(df_sf_square, df_sf_block)) %>%
-  ggplot() +
-  geom_sf(data = df_sf_block, fill = "salmon") +
-  geom_sf(aes(colour = overlap))
-```
-
-OK, so now to bring in the vector fonts of cool but useless.
-
-
-Plot the number 7
-
-```{r}
-ggplot(char_7,
-       aes(x, y, group = stroke)) + 
-  geom_path() +
-  geom_label(aes(label = idx)) +
-  # geom_polygon(aes(x, y, group = stroke)) +
-  coord_equal()
-```
-
-```{r}
-library(gridfont)
-
-plot_df <- create_text_df("1", font='smooth')
-
-ggplot(plot_df, aes(x, y)) +
-  geom_path(aes(group = interaction(char_idx, stroke)), 
-            na.rm=TRUE) +
-  coord_equal() +
-  theme_void()
-```
-
-
-```{r}
-create_text_df("7", font='smooth') %>% 
-  ggplot(aes(x, y, group = stroke)) + 
-  geom_path() +
-  coord_equal()
-```
-
-
-```{r}
-cast_font_sf <- function(font_df){
-  font_df %>% 
-  st_as_sf(coords = c("x", "y")) %>% 
-  group_by(char) %>%
-  summarise(do_union = FALSE) %>%
-  st_cast("LINESTRING") %>% 
-  ungroup() 
+# create_text_df("n", font='smooth')
+glyph <- function(glyph, 
+                  family = "serif", 
+                  face = "regular",
+                  nseg = 10) {
+  
+  if (nchar(glyph) > 1){
+    stop("'glyph' only takes one character, input '", 
+         glyph, 
+         "' is more than one character")
+  }
+  
+  fontr::glyph_polygon(ch = glyph, 
+                       family = family, 
+                       face = face,
+                       nseg = nseg) %>% 
+    dplyr::mutate(glyph = glyph) %>% 
+    tibble::as_tibble()
 }
+
+glyph_1 <- glyph("1")
 ```
 
-```{r}
-char_sf_7 %>% 
-  ggplot() +
-  geom_sf()
-
-# install.packages("smoothr")
-```
+(and resize the font if needed)
 
 ```{r}
 font_increase <- function(font_df, size){
   font_df %>% 
-    mutate(x = x * size,
-           y = y * size)
+    dplyr::mutate(x = x * size,
+                  y = y * size)
 }
 
-create_text_df("7", font='smooth') %>% 
-  font_increase(3) %>% 
-  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
-  ggplot(aes(x, y, group = stroke)) + 
-  geom_path() +
-  coord_equal()
-```
-
-
-```{r}
-circle_vec <- sample(x = ((1:125)/100),
-                     size = 1000,
-                     replace = TRUE)
-
-many_square_sf <- create_poly_packings(areas = circle_vec,
-                                       n_points = 50) %>% 
-  cast_packing_poly()
-
-char_sf_7 <- create_text_df("7", font='smooth') %>% 
-  font_increase(4)  %>% 
-  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
-  mutate(y = y + 3) %>% 
-  cast_font_sf()
-
-char_sf_7 %>% 
-  ggplot() +
-  geom_sf(data = many_square_sf) +
-  geom_sf(colour = "red") 
-```
-
-
-```{r}
-adds_text_in_circles <- function(circles, text){
-  circles %>% 
-  mutate(in_text = is_sf_intersects(circles, text))
+font_center <- function(text_df){
+  text_df %>% 
+    dplyr::mutate_at(dplyr::vars(x, y), scale, scale = FALSE) 
 }
 
-char_sf_7 %>% 
-  adds_text_in_circles(many_square_sf, .) %>% 
-  ggplot() +
-  geom_sf(aes(fill = in_text),
-          colour = "white") +
-  theme_void() +
-  scale_fill_brewer(palette = "Dark2") +
-  theme(legend.position = "none")
+font_shift <- function(text_df,
+                       x_shift = 0, 
+                       y_shift = 3){
+  text_df %>% 
+    dplyr::mutate(y = y + y_shift,
+                  x = x + x_shift) 
+}
+
+glyph_1 <- glyph("1")
+
+ggplot(glyph_1,
+       aes(x = x,
+           y = y,
+           group = glyph)) + 
+  geom_polygon()
+  
+glyph_1_bigger <-
+  glyph_1 %>% 
+  font_increase(35) %>% 
+  font_center() 
+
+  # ggplot(aes(x = x,
+  #            y = y,
+  #            group = glyph)) + 
+  # geom_polygon()
 
 ```
 
-# OK, so putting that all together
+# 4. Convert that font into an SF object
 
 ```{r}
-create_circle_plate <- function(){
-circle_vec <- sample(x = ((1:125)/100),
-                     size = 1000,
-                     replace = TRUE)
-
-create_poly_packings(areas = circle_vec, n_points = 50) %>% 
-  cast_packing_poly()
+cast_font_sf <- function(font_df){
+  font_df %>% 
+  sf::st_as_sf(coords = c("x", "y")) %>% 
+  dplyr::group_by(glyph) %>%
+  dplyr::summarise(do_union = FALSE) %>%
+  sf::st_cast("POLYGON") %>% 
+  dplyr::ungroup() 
 }
 
-text_sf <- function(text){
-  create_text_df(text, font='smooth') %>% 
-  font_increase(4)  %>% 
-  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
-  mutate(y = y + 3) %>% 
-  cast_font_sf()
-}
+glyph_1_sf <- cast_font_sf(glyph_1_bigger)
+```
 
-overlay_text_in_circle <- function(circle_plate, text_sf){
+# 5. Overlay the two SF objects and see where they intersect
+
+```{r}
+overlay_text_in_circle <- function(circle_plate, glyph_sf){
   circle_plate %>% 
-    mutate(in_text = is_sf_intersects(circle_plate, text_sf))
+    dplyr::mutate(in_text = is_sf_intersects(circle_plate, glyph_sf))
 }
 
+overlayed_circle <- overlay_text_in_circle(circle_plate_sf, glyph_1_sf)
+```
+
+# 6. Plot the circles that are intersected by the text
+
+```{r}
 plot_ishihara <- function(overlayed_text){
-  ggplot(overlayed_text) +
-  geom_sf(aes(fill = in_text),
-          colour = "white") +
-  theme_void() +
-  theme(legend.position = "none")
+  ggplot2::ggplot(overlayed_text) +
+  ggplot2::geom_sf(ggplot2::aes(fill = in_text),
+                   colour = "white") +
+  ggplot2::theme_void() +
+  ggplot2::theme(legend.position = "none")
 }
 
-ishihara_data <- function(text){
-  circle_plate <- create_circle_plate()
-  overlay_text_in_circle(circle_plate, text_sf(text))
-}
-```
-
-```{r}
-cb_1 <- ishihara_data("1")
-
-gg_ishihara <- plot_ishihara(cb_1)
-gg_ishihara
-gg_ishihara + scale_fill_brewer(palette = "Dark2")
-gg_ishihara + scale_fill_viridis_d()
-```
-
-```{r}
-circle_vec <- sample(x = ((1:125)/100),
-                     size = 1000,
-                     replace = TRUE)
-
-circles_df <- create_poly_packings(areas = circle_vec, n_points = 50)
-
-circles_sf <- cast_packing_poly(circles_df)
-
-text_df <- create_text_df("7", font='smooth')
-
-mean(text_df$x)
-mean(text_df$y)
-
-text_df %>% 
-  mutate_at(vars(x, y), scale, scale = FALSE) %>% 
-  font_increase(4)  %>% 
-  # mutate(y = y + 3) %>% 
-  cast_font_sf() %>% 
-  ggplot() +
-  geom_sf(data = circles_sf) +
-  geom_sf()
+plot_ishihara(overlayed_circle)
 ```
 
 
-```{r}
-# an example of creating a circle  
-# from https://gis.stackexchange.com/questions/322423/create-a-circle-in-r-and-plot-it-in-a-shapefile
-lon <- -71.06
-lat <- 42.36
-dub <- st_point(x = c(lon, lat), dim = "XYZ")
-dub <- dub %>% st_sfc(crs = 32619)
-m5 <- units::set_units(1, km)
-dub_buffer <-  st_buffer(dub, m5)
-plot(dub_buffer)
+# 7. Change the colour palette in ggplot2 to see the impact of colourblindness
 
+```{r}
+plot_ishihara(overlayed_circle) +
+  scale_fill_viridis_d()
 ```
 
