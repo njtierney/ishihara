@@ -1,6 +1,7 @@
 #' Create Ishihara data
 #'
 #' @param text character vector, only one character
+#' @param text_prop - proportion of height of the text
 #'
 #' @return ishihara plate with packed circles that are marked
 #'   with whether the text overlays on the circles
@@ -8,13 +9,13 @@
 #'
 #' @examples
 #' ishihara_data("s")
-ishihara_data <- function(text){
+ishihara_data <- function(text, text_prop = 0.5){
 
   circle_plate <- create_circle_plate()
   # Convert circles to an `sf` spatial object.
   circle_plate_sf <- cast_packing_poly(circle_plate)
   # Pull in a vector font (and resize the font)
-  letter <- glyph(text) %>% font_rescale(circle_plate)
+  letter <- glyph(text) %>% font_rescale(circle_plate, prop = text_prop)
   # Convert that font into an SF object
   letter_sf <- cast_font_sf(letter)
   # Overlay the two SF objects and see where they intersect

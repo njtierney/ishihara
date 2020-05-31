@@ -4,10 +4,14 @@
 \alias{ishihara_data}
 \title{Create Ishihara data}
 \usage{
-ishihara_data(text)
+ishihara_data(text, text_prop = 0.5)
 }
 \arguments{
 \item{text}{character vector, only one character}
+
+\item{text_prop}{\itemize{
+\item proportion of height of the text
+}}
 }
 \value{
 ishihara plate with packed circles that are marked
