@@ -39,143 +39,49 @@ Here's the goal:
 7. Change the colour palette in ggplot2 to see the impact of colourblindness
 
 
-# 1. Create a bunch of circles with `packcircles`
-
-```{r}
-create_circle_plate <- function(){
-  circle_vec <- sample(x = (c(seq(from = 25, to = 150, by = 25))/100),
-                       size = 1000,
-                       replace = TRUE)
-  
-  create_poly_packings(areas = circle_vec, 
-                       n_points = 50)
-}
-```
+# 1. Create a bunch of circles
 
 ```{r}
 circle_plate <- create_circle_plate()
 ```
 
-
-# 2. Convert that to an SF object
+# 2. Convert circles to an `sf` spatial object.
 
 ```{r}
 circle_plate_sf <- cast_packing_poly(circle_plate)
 ```
 
-# 3. Pull in a vector font
+# 3. Pull in a vector font (and resize the font)
 
 ```{r}
-# create_text_df("n", font='smooth')
-glyph <- function(glyph, 
-                  family = "serif", 
-                  face = "regular",
-                  nseg = 10) {
-  
-  if (nchar(glyph) > 1){
-    stop("'glyph' only takes one character, input '", 
-         glyph, 
-         "' is more than one character")
-  }
-  
-  fontr::glyph_polygon(ch = glyph, 
-                       family = family, 
-                       face = face,
-                       nseg = nseg) %>% 
-    dplyr::mutate(glyph = glyph) %>% 
-    tibble::as_tibble()
-}
-
-glyph_1 <- glyph("1")
+letter_s <- glyph("s") %>% font_rescale(circle_plate)
 ```
 
-(and resize the font if needed)
+# 4. Convert that font into an SF object 
 
 ```{r}
-font_increase <- function(font_df, size){
-  font_df %>% 
-    dplyr::mutate(x = x * size,
-                  y = y * size)
-}
-
-font_center <- function(text_df){
-  text_df %>% 
-    dplyr::mutate_at(dplyr::vars(x, y), scale, scale = FALSE) 
-}
-
-font_shift <- function(text_df,
-                       x_shift = 0, 
-                       y_shift = 3){
-  text_df %>% 
-    dplyr::mutate(y = y + y_shift,
-                  x = x + x_shift) 
-}
-
-glyph_1 <- glyph("1")
-
-ggplot(glyph_1,
-       aes(x = x,
-           y = y,
-           group = glyph)) + 
-  geom_polygon()
-  
-glyph_1_bigger <-
-  glyph_1 %>% 
-  font_increase(35) %>% 
-  font_center() 
-
-  # ggplot(aes(x = x,
-  #            y = y,
-  #            group = glyph)) + 
-  # geom_polygon()
-
-```
-
-# 4. Convert that font into an SF object
-
-```{r}
-cast_font_sf <- function(font_df){
-  font_df %>% 
-  sf::st_as_sf(coords = c("x", "y")) %>% 
-  dplyr::group_by(glyph) %>%
-  dplyr::summarise(do_union = FALSE) %>%
-  sf::st_cast("POLYGON") %>% 
-  dplyr::ungroup() 
-}
-
-glyph_1_sf <- cast_font_sf(glyph_1_bigger)
+letter_s_sf <- cast_font_sf(letter_s)
 ```
 
 # 5. Overlay the two SF objects and see where they intersect
 
 ```{r}
-overlay_text_in_circle <- function(circle_plate, glyph_sf){
-  circle_plate %>% 
-    dplyr::mutate(in_text = is_sf_intersects(circle_plate, glyph_sf))
-}
-
-overlayed_circle <- overlay_text_in_circle(circle_plate_sf, glyph_1_sf)
+overlayed_circle <- overlay_text_in_circle(circle_plate_sf, letter_s_sf)
 ```
 
-# 6. Plot the circles that are intersected by the text
+# 6. plot the object
 
-```{r}
-plot_ishihara <- function(overlayed_text){
-  ggplot2::ggplot(overlayed_text) +
-  ggplot2::geom_sf(ggplot2::aes(fill = in_text),
-                   colour = "white") +
-  ggplot2::theme_void() +
-  ggplot2::theme(legend.position = "none")
-}
-
-plot_ishihara(overlayed_circle)
+```{r plot-ishihara}
+gg_ishihara <- ggplot(overlayed_circle) +
+  geom_sf(aes(fill = in_text),
+          colour = "white") +
+  theme_void() +
+  theme(legend.position = "none")
 ```
-
 
 # 7. Change the colour palette in ggplot2 to see the impact of colourblindness
 
-```{r}
-plot_ishihara(overlayed_circle) +
-  scale_fill_viridis_d()
+```{r plot-multiple-colours}
+gg_ishihara + scale_fill_viridis_d()
 ```
 

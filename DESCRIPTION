@@ -24,8 +24,10 @@ Imports:
     magrittr,
     dplyr,
     sf,
-    hershey (>= 0.1.0)
+    fontr (>= 0.1),
+    ggplot2,
+    purrr
 Remotes: 
-    coolbutuseless/hershey
+    yixuan/fontr
 Depends: 
     R (>= 2.10)
